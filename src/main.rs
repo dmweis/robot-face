@@ -5,35 +5,55 @@ use bevy::{
     window::{CursorGrabMode, PresentMode, WindowLevel, WindowTheme},
 };
 use bevy_prototype_lyon::prelude::*;
+use clap::Parser;
 use std::f64::consts::PI;
 
+/// Run robot face animation
+#[derive(Parser, Debug)]
+#[command(version, about, long_about)]
+struct Args {
+    /// Run in dev mode
+    #[arg(short, long)]
+    dev_mode: bool,
+}
+
 fn main() {
+    let args = Args::parse();
+
+    let mut window_settings = Window {
+        title: "robot face".into(),
+        name: Some("face.app".into()),
+        resolution: (480., 800.).into(),
+        present_mode: PresentMode::AutoVsync,
+        window_theme: Some(WindowTheme::Dark),
+        enabled_buttons: bevy::window::EnabledButtons {
+            maximize: false,
+            minimize: false,
+            ..Default::default()
+        },
+        visible: false,
+        window_level: WindowLevel::AlwaysOnTop,
+        mode: bevy::window::WindowMode::Fullscreen,
+        cursor: bevy::window::Cursor {
+            visible: false,
+            grab_mode: CursorGrabMode::Confined,
+            ..default()
+        },
+        ..default()
+    };
+
+    if args.dev_mode {
+        window_settings.window_level = WindowLevel::Normal;
+        window_settings.mode = bevy::window::WindowMode::Windowed;
+        window_settings.cursor.grab_mode = CursorGrabMode::None;
+        window_settings.cursor.visible = true;
+    }
+
     App::new()
         .insert_resource(Msaa::Sample4)
         .add_plugins((
             DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "robot face".into(),
-                    name: Some("face.app".into()),
-                    resolution: (480., 800.).into(),
-                    present_mode: PresentMode::AutoVsync,
-                    window_theme: Some(WindowTheme::Dark),
-                    enabled_buttons: bevy::window::EnabledButtons {
-                        maximize: false,
-                        minimize: false,
-                        ..Default::default()
-                    },
-                    visible: false,
-                    window_level: WindowLevel::AlwaysOnTop,
-                    mode: bevy::window::WindowMode::Fullscreen,
-                    cursor: bevy::window::Cursor {
-                        visible: false,
-                        grab_mode: CursorGrabMode::Confined,
-                        ..default()
-                    },
-
-                    ..default()
-                }),
+                primary_window: Some(window_settings),
                 ..default()
             }),
             LogDiagnosticsPlugin::default(),
@@ -45,12 +65,15 @@ fn main() {
             Update,
             (
                 toggle_fullscreen,
-                change_draw_mode_system,
-                change_number_of_sides,
-                rotate_shape_system,
-                make_visible,
                 bevy::window::close_on_esc,
                 mouse_click_system,
+                make_visible,
+                (
+                    change_number_of_sides,
+                    change_draw_mode_system,
+                    rotate_shape_system,
+                )
+                    .chain(),
             ),
         )
         .run();
