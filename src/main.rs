@@ -15,6 +15,10 @@ struct Args {
     /// Run in dev mode
     #[arg(short, long)]
     dev_mode: bool,
+
+    /// Cycle shapes
+    #[arg(short, long)]
+    cycle_shapes: bool,
 }
 
 fn main() {
@@ -69,7 +73,12 @@ fn main() {
                 mouse_click_system,
                 make_visible,
                 (
-                    change_number_of_sides,
+                    // change_number_of_sides,
+                    if args.cycle_shapes {
+                        change_number_of_sides
+                    } else {
+                        nothing
+                    },
                     change_draw_mode_system,
                     rotate_shape_system,
                 )
@@ -132,6 +141,8 @@ fn change_number_of_sides(mut query: Query<&mut Path>, time: Res<Time>) {
         *path = ShapePath::build_as(&polygon);
     }
 }
+
+fn nothing(mut _query: Query<&mut Path>, _time: Res<Time>) {}
 
 fn make_visible(mut window: Query<&mut Window>, frames: Res<FrameCount>) {
     // The delay may be different for your app or system.
