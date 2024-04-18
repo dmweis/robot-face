@@ -50,6 +50,7 @@ fn main() {
                 rotate_shape_system,
                 make_visible,
                 bevy::window::close_on_esc,
+                mouse_click_system,
             ),
         )
         .run();
@@ -129,5 +130,21 @@ fn toggle_fullscreen(mut windows: Query<&mut Window>, input: Res<ButtonInput<Key
             bevy::window::WindowMode::Windowed => bevy::window::WindowMode::Fullscreen,
             _ => bevy::window::WindowMode::Windowed,
         };
+    }
+}
+
+fn mouse_click_system(
+    mut commands: Commands,
+    focused_windows: Query<(Entity, &Window)>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+) {
+    for (window, focus) in focused_windows.iter() {
+        if !focus.focused {
+            continue;
+        }
+
+        if mouse_button_input.just_pressed(MouseButton::Right) {
+            commands.entity(window).despawn();
+        }
     }
 }
