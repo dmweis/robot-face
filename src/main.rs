@@ -134,7 +134,7 @@ fn change_number_of_sides(mut query: Query<&mut Path>, time: Res<Time>) {
     for mut path in query.iter_mut() {
         let polygon = shapes::RegularPolygon {
             sides,
-            feature: shapes::RegularPolygonFeature::Radius(200.0),
+            feature: shapes::RegularPolygonFeature::Radius(180.0),
             ..shapes::RegularPolygon::default()
         };
 
