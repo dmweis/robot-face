@@ -5,7 +5,7 @@ use bevy::{
         SystemInformationDiagnosticsPlugin,
     },
     prelude::*,
-    window::{CursorGrabMode, PresentMode, WindowLevel, WindowTheme},
+    window::{CursorGrabMode, PresentMode, WindowLevel, WindowResolution, WindowTheme},
 };
 use bevy_prototype_lyon::prelude::*;
 use clap::Parser;
@@ -28,7 +28,7 @@ fn main() {
     let mut window_settings = Window {
         title: "robot face".into(),
         name: Some("face.app".into()),
-        resolution: (480., 800.).into(),
+        resolution: WindowResolution::new(480., 800.).with_scale_factor_override(1.0),
         present_mode: PresentMode::AutoVsync,
         window_theme: Some(WindowTheme::Dark),
         enabled_buttons: bevy::window::EnabledButtons {
