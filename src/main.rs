@@ -9,8 +9,8 @@ use bevy::{
 };
 use bevy_prototype_lyon::prelude::*;
 use clap::Parser;
-use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin};
-use noise::{BasicMulti, MultiFractal, NoiseFn, Perlin, Seedable};
+use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin, PerfUiRoot};
+use noise::{BasicMulti, MultiFractal, NoiseFn, Perlin};
 use std::collections::VecDeque;
 
 /// Run robot face animation
@@ -20,10 +20,6 @@ struct Args {
     /// Run in dev mode
     #[arg(short, long)]
     dev_mode: bool,
-
-    /// Cycle shapes
-    #[arg(short, long)]
-    cycle_shapes: bool,
 }
 
 fn main() {
@@ -75,14 +71,18 @@ fn main() {
         .add_systems(Startup, setup_system)
         .add_systems(
             Update,
+            toggle_perf_ui.before(iyes_perf_ui::PerfUiSet::Setup),
+        )
+        .add_systems(
+            Update,
             (
                 toggle_fullscreen,
                 bevy::window::close_on_esc,
                 mouse_click_system,
                 make_visible,
-                update_noise_plot,
             ),
         )
+        .add_systems(FixedUpdate, update_noise_plot)
         .run();
 }
 
@@ -95,12 +95,11 @@ struct NoiseWave;
 fn setup_system(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    commands.spawn(PerfUiCompleteBundle::default());
-
     let points = [Vec2::new(-1.0, 0.0), Vec2::new(1.0, 0.0)].map(|x| x * 10000.);
 
     let shape = shapes::Polygon {
         points: points.into_iter().collect(),
+        // radius: 1.0,
         closed: false,
     };
 
@@ -182,7 +181,6 @@ fn update_noise_plot(
     let mut resolution = Rect::default();
     for camera in query_camera.iter() {
         resolution = camera.area;
-        // info!("{:?}", camera.area);
     }
 
     let width = resolution.width() as usize;
@@ -195,7 +193,7 @@ fn update_noise_plot(
             .noise
             .iter()
             .enumerate()
-            .map(|(index, point)| Vec2::new(resolution.min.x + index as f32, *point as f32 * 300.0))
+            .map(|(index, point)| Vec2::new(resolution.min.x + index as f32, *point as f32 * 400.0))
             .collect();
 
         let shape = shapes::Polygon {
@@ -207,6 +205,23 @@ fn update_noise_plot(
     }
 }
 
-fn map(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
-    (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+// fn map(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
+//     (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+// }
+
+fn toggle_perf_ui(
+    mut commands: Commands,
+    q_root: Query<Entity, With<PerfUiRoot>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+) {
+    if mouse.just_pressed(MouseButton::Middle) {
+        if let Ok(e) = q_root.get_single() {
+            // despawn the existing Perf UI
+            commands.entity(e).despawn_recursive();
+        } else {
+            // create a simple Perf UI with default settings
+            // and all entries provided by the crate:
+            commands.spawn(PerfUiCompleteBundle::default());
+        }
+    }
 }
