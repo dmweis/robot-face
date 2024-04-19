@@ -26,4 +26,6 @@ use `WGPU_BACKEND="gl"` to switch to OpenGL. But it doesn't seem to work
 
 ## Building on linux
 
-`sudo apt-get update && sudo apt-get install librust-alsa-sys-dev libudev-dev librust-wayland-sys-dev`
+```shell
+sudo apt-get update && sudo apt-get install librust-alsa-sys-dev libudev-dev librust-wayland-sys-dev -y
+```
