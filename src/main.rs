@@ -1,12 +1,17 @@
 use bevy::{
     core::FrameCount,
-    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    diagnostic::{
+        EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin,
+        SystemInformationDiagnosticsPlugin,
+    },
     prelude::*,
     window::{CursorGrabMode, PresentMode, WindowLevel, WindowTheme},
 };
 use bevy_prototype_lyon::prelude::*;
 use clap::Parser;
-use std::f64::consts::PI;
+use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin};
+use noise::{BasicMulti, MultiFractal, NoiseFn, Perlin, Seedable};
+use std::collections::VecDeque;
 
 /// Run robot face animation
 #[derive(Parser, Debug)]
@@ -62,8 +67,11 @@ fn main() {
             }),
             LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin,
+            EntityCountDiagnosticsPlugin,
+            SystemInformationDiagnosticsPlugin,
         ))
         .add_plugins(ShapePlugin)
+        .add_plugins(PerfUiPlugin)
         .add_systems(Startup, setup_system)
         .add_systems(
             Update,
@@ -72,17 +80,7 @@ fn main() {
                 bevy::window::close_on_esc,
                 mouse_click_system,
                 make_visible,
-                (
-                    // change_number_of_sides,
-                    if args.cycle_shapes {
-                        change_number_of_sides
-                    } else {
-                        nothing
-                    },
-                    change_draw_mode_system,
-                    rotate_shape_system,
-                )
-                    .chain(),
+                update_noise_plot,
             ),
         )
         .run();
@@ -91,58 +89,39 @@ fn main() {
 #[derive(Component)]
 struct ExampleShape;
 
+#[derive(Component)]
+struct NoiseWave;
+
 fn setup_system(mut commands: Commands) {
-    let shape = shapes::RegularPolygon {
-        sides: 6,
-        feature: shapes::RegularPolygonFeature::Radius(180.0),
-        ..shapes::RegularPolygon::default()
+    commands.spawn(Camera2dBundle::default());
+
+    commands.spawn(PerfUiCompleteBundle::default());
+
+    let points = [Vec2::new(-1.0, 0.0), Vec2::new(1.0, 0.0)].map(|x| x * 10000.);
+
+    let shape = shapes::Polygon {
+        points: points.into_iter().collect(),
+        closed: false,
     };
 
-    commands.spawn(Camera2dBundle::default());
     commands.spawn((
         ShapeBundle {
             path: GeometryBuilder::build_as(&shape),
             ..default()
         },
-        Fill::color(Color::CYAN),
-        Stroke::new(Color::BLACK, 10.0),
-        ExampleShape,
+        Stroke::new(Color::BLACK, 2.0),
+        Fill::color(Color::NONE),
+        NoiseWave,
     ));
+
+    let mut perlin_noise = BasicMulti::<Perlin>::new(100);
+    perlin_noise = perlin_noise.set_octaves(2);
+
+    commands.insert_resource(NoiseGenerator {
+        generator: perlin_noise,
+        noise: VecDeque::new(),
+    });
 }
-
-fn rotate_shape_system(mut query: Query<&mut Transform, With<ExampleShape>>, time: Res<Time>) {
-    let delta = time.delta_seconds();
-
-    for mut transform in query.iter_mut() {
-        transform.rotate(Quat::from_rotation_z(0.2 * delta));
-    }
-}
-
-fn change_draw_mode_system(mut query: Query<(&mut Fill, &mut Stroke)>, time: Res<Time>) {
-    let hue = (time.elapsed_seconds_f64() * 50.0) % 360.0;
-    let outline_width = 2.0 + time.elapsed_seconds_f64().sin().abs() * 10.0;
-
-    for (mut fill_mode, mut stroke_mode) in query.iter_mut() {
-        fill_mode.color = Color::hsl(hue as f32, 1.0, 0.5);
-        stroke_mode.options.line_width = outline_width as f32;
-    }
-}
-
-fn change_number_of_sides(mut query: Query<&mut Path>, time: Res<Time>) {
-    let sides = ((time.elapsed_seconds_f64() - PI * 2.5).sin() * 2.5 + 5.5).round() as usize;
-
-    for mut path in query.iter_mut() {
-        let polygon = shapes::RegularPolygon {
-            sides,
-            feature: shapes::RegularPolygonFeature::Radius(180.0),
-            ..shapes::RegularPolygon::default()
-        };
-
-        *path = ShapePath::build_as(&polygon);
-    }
-}
-
-fn nothing(mut _query: Query<&mut Path>, _time: Res<Time>) {}
 
 fn make_visible(mut window: Query<&mut Window>, frames: Res<FrameCount>) {
     // The delay may be different for your app or system.
@@ -181,4 +160,53 @@ fn mouse_click_system(
             commands.entity(window).despawn();
         }
     }
+}
+
+#[derive(Resource)]
+struct NoiseGenerator {
+    generator: BasicMulti<Perlin>,
+    noise: VecDeque<f64>,
+}
+
+fn update_noise_plot(
+    mut query: Query<&mut Path, With<NoiseWave>>,
+    query_camera: Query<&OrthographicProjection>,
+    time: Res<Time>,
+    mut noise_generator: ResMut<NoiseGenerator>,
+) {
+    let step = time.elapsed_seconds_f64();
+
+    let next_noise = noise_generator.generator.get([step, 0.]);
+    noise_generator.noise.push_back(next_noise);
+
+    let mut resolution = Rect::default();
+    for camera in query_camera.iter() {
+        resolution = camera.area;
+        // info!("{:?}", camera.area);
+    }
+
+    let width = resolution.width() as usize;
+    while noise_generator.noise.len() > width {
+        noise_generator.noise.pop_front();
+    }
+
+    for mut path in query.iter_mut() {
+        let points = noise_generator
+            .noise
+            .iter()
+            .enumerate()
+            .map(|(index, point)| Vec2::new(resolution.min.x + index as f32, *point as f32 * 300.0))
+            .collect();
+
+        let shape = shapes::Polygon {
+            points,
+            closed: false,
+        };
+
+        *path = ShapePath::build_as(&shape);
+    }
+}
+
+fn map(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
+    (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 }
