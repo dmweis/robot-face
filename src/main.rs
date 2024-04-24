@@ -118,7 +118,6 @@ fn setup_system(mut commands: Commands) {
 
     commands.insert_resource(NoiseGenerator {
         generator: perlin_noise,
-        noise: VecDeque::new(),
     });
 }
 
@@ -164,14 +163,71 @@ fn mouse_click_system(
 #[derive(Resource)]
 struct NoiseGenerator {
     generator: BasicMulti<Perlin>,
-    noise: VecDeque<f64>,
 }
+
+const WIDTH_COEFFICIENT: f64 = 100.0;
+const HEIGHT_COEFFICIENT: f32 = 100.0;
 
 fn update_noise_plot(
     mut query: Query<&mut Path, With<NoiseWave>>,
     query_camera: Query<&OrthographicProjection>,
     time: Res<Time>,
-    mut noise_generator: ResMut<NoiseGenerator>,
+    noise_generator: ResMut<NoiseGenerator>,
+) {
+    let step = time.elapsed_seconds_f64();
+
+    let mut resolution = Rect::default();
+    for camera in query_camera.iter() {
+        resolution = camera.area;
+    }
+
+    let width = resolution.width() as usize;
+
+    let mut noise = Vec::with_capacity(width);
+
+    for i in 0..width {
+        let next_noise = noise_generator
+            .generator
+            .get([step, (i as f64 / WIDTH_COEFFICIENT)]);
+        noise.push(next_noise);
+    }
+
+    for mut path in query.iter_mut() {
+        let points = noise
+            .iter()
+            .enumerate()
+            .map(|(index, point)| {
+                Vec2::new(
+                    resolution.min.x + index as f32,
+                    *point as f32 * HEIGHT_COEFFICIENT,
+                )
+            })
+            .collect();
+
+        let shape = shapes::Polygon {
+            points,
+            closed: false,
+        };
+
+        *path = ShapePath::build_as(&shape);
+    }
+}
+
+// fn map(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
+//     (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+// }
+
+#[derive(Resource)]
+struct MovingNoiseGenerator {
+    generator: BasicMulti<Perlin>,
+    noise: VecDeque<f64>,
+}
+
+fn update_moving_noise_plot(
+    mut query: Query<&mut Path, With<NoiseWave>>,
+    query_camera: Query<&OrthographicProjection>,
+    time: Res<Time>,
+    mut noise_generator: ResMut<MovingNoiseGenerator>,
 ) {
     let step = time.elapsed_seconds_f64();
 
@@ -204,10 +260,6 @@ fn update_noise_plot(
         *path = ShapePath::build_as(&shape);
     }
 }
-
-// fn map(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
-//     (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-// }
 
 fn toggle_perf_ui(
     mut commands: Commands,
