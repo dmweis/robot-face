@@ -5,10 +5,6 @@ use bevy::{
         SystemInformationDiagnosticsPlugin,
     },
     prelude::*,
-    render::{
-        settings::{Backends, WgpuSettings},
-        RenderPlugin,
-    },
     window::{CursorGrabMode, PresentMode, WindowLevel, WindowResolution, WindowTheme},
 };
 use bevy_prototype_lyon::prelude::*;
@@ -16,6 +12,12 @@ use clap::Parser;
 use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin, PerfUiRoot};
 use noise::{BasicMulti, MultiFractal, NoiseFn, Perlin};
 use std::collections::VecDeque;
+
+const WIDTH_COEFFICIENT: f64 = 60.0;
+const HEIGHT_COEFFICIENT: f32 = 400.0;
+const POINT_WIDTH: usize = 5;
+const FRAME_TIME_DIVIDER: f64 = 2.0;
+const PERLIN_NOISE_OCTAVES: usize = 8;
 
 /// Run robot face animation
 #[derive(Parser, Debug)]
@@ -61,20 +63,10 @@ fn main() {
     App::new()
         .insert_resource(Msaa::Sample4)
         .add_plugins((
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(window_settings),
-                    ..default()
-                })
-                .set(RenderPlugin {
-                    render_creation: WgpuSettings {
-                        backends: Some(Backends::VULKAN),
-                        power_preference: bevy::render::settings::PowerPreference::HighPerformance,
-                        ..default()
-                    }
-                    .into(),
-                    ..default()
-                }),
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(window_settings),
+                ..default()
+            }),
             LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin,
             EntityCountDiagnosticsPlugin,
@@ -94,9 +86,9 @@ fn main() {
                 bevy::window::close_on_esc,
                 mouse_click_system,
                 make_visible,
+                update_noise_plot,
             ),
         )
-        .add_systems(FixedUpdate, update_noise_plot)
         .run();
 }
 
@@ -128,7 +120,7 @@ fn setup_system(mut commands: Commands) {
     ));
 
     let mut perlin_noise = BasicMulti::<Perlin>::new(100);
-    perlin_noise = perlin_noise.set_octaves(2);
+    perlin_noise = perlin_noise.set_octaves(PERLIN_NOISE_OCTAVES);
 
     commands.insert_resource(NoiseGenerator {
         generator: perlin_noise,
@@ -151,8 +143,8 @@ fn toggle_fullscreen(mut windows: Query<&mut Window>, input: Res<ButtonInput<Key
         let mut window = windows.single_mut();
 
         window.mode = match window.mode {
-            bevy::window::WindowMode::Fullscreen => bevy::window::WindowMode::Windowed,
-            bevy::window::WindowMode::Windowed => bevy::window::WindowMode::Fullscreen,
+            bevy::window::WindowMode::BorderlessFullscreen => bevy::window::WindowMode::Windowed,
+            bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen,
             _ => bevy::window::WindowMode::Windowed,
         };
     }
@@ -178,11 +170,6 @@ fn mouse_click_system(
 struct NoiseGenerator {
     generator: BasicMulti<Perlin>,
 }
-
-const WIDTH_COEFFICIENT: f64 = 20.0;
-const HEIGHT_COEFFICIENT: f32 = 100.0;
-const POINT_WIDTH: usize = 5;
-const FRAME_TIME_DIVIDER: f64 = 2.0;
 
 fn update_noise_plot(
     mut query: Query<&mut Path, With<NoiseWave>>,
@@ -229,16 +216,19 @@ fn update_noise_plot(
     }
 }
 
-// fn map(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
-//     (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-// }
+#[allow(dead_code)]
+fn map(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
+    (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+}
 
 #[derive(Resource)]
+#[allow(dead_code)]
 struct MovingNoiseGenerator {
     generator: BasicMulti<Perlin>,
     noise: VecDeque<f64>,
 }
 
+#[allow(dead_code)]
 fn update_moving_noise_plot(
     mut query: Query<&mut Path, With<NoiseWave>>,
     query_camera: Query<&OrthographicProjection>,
