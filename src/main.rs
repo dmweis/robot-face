@@ -1,3 +1,4 @@
+use anyhow::Context;
 use bevy::{
     core::FrameCount,
     diagnostic::{
@@ -11,9 +12,10 @@ use bevy_prototype_lyon::prelude::*;
 use clap::Parser;
 use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin, PerfUiRoot};
 use noise::{BasicMulti, MultiFractal, NoiseFn, Perlin};
+use thiserror::Error;
 use tokio::{
     runtime,
-    sync::mpsc::{channel, Receiver},
+    sync::mpsc::{channel, Receiver, Sender},
 };
 use zenoh::prelude::r#async::*;
 
@@ -22,6 +24,9 @@ const HEIGHT_MULTIPLIER: f64 = 400.0;
 const SEGMENT_WIDTH: f32 = 5.0;
 const FRAME_TIME_DIVIDER: f64 = 2.0;
 const PERLIN_NOISE_OCTAVES: usize = 8;
+
+const LINE_WIDTH: f32 = 2.0;
+const PERLIN_NOISE_SEED: u32 = 100;
 
 #[derive(Resource)]
 struct NoiseGeneratorSettings {
@@ -67,7 +72,7 @@ fn main() {
         },
         visible: false,
         window_level: WindowLevel::AlwaysOnTop,
-        mode: bevy::window::WindowMode::Fullscreen,
+        mode: bevy::window::WindowMode::BorderlessFullscreen,
         cursor: bevy::window::Cursor {
             visible: false,
             grab_mode: CursorGrabMode::Confined,
@@ -87,14 +92,10 @@ fn main() {
         .insert_resource(Msaa::Sample4)
         .insert_resource(NoiseGeneratorSettings::default())
         .add_plugins((
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(window_settings),
-                    ..default()
-                })
-                .set(TaskPoolPlugin {
-                    task_pool_options: TaskPoolOptions::with_num_threads(1),
-                }),
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(window_settings),
+                ..default()
+            }),
             LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin,
             EntityCountDiagnosticsPlugin,
@@ -105,11 +106,8 @@ fn main() {
         .add_systems(Startup, (setup_system, start_zenoh_worker))
         .add_systems(
             Update,
-            toggle_perf_ui.before(iyes_perf_ui::PerfUiSet::Setup),
-        )
-        .add_systems(
-            Update,
             (
+                toggle_perf_ui.before(iyes_perf_ui::PerfUiSet::Setup),
                 toggle_fullscreen,
                 bevy::window::close_on_esc,
                 close_on_right_click,
@@ -147,7 +145,7 @@ fn setup_system(mut commands: Commands) {
             },
             ..default()
         },
-        Stroke::new(Color::WHITE, 2.0),
+        Stroke::new(Color::WHITE, LINE_WIDTH),
         Fill::color(Color::NONE),
         NoiseWave,
     ));
@@ -160,12 +158,12 @@ fn setup_system(mut commands: Commands) {
             },
             ..default()
         },
-        Stroke::new(Color::WHITE, 2.0),
+        Stroke::new(Color::WHITE, LINE_WIDTH),
         Fill::color(Color::NONE),
         NoiseWave,
     ));
 
-    let mut perlin_noise = BasicMulti::<Perlin>::new(100);
+    let mut perlin_noise = BasicMulti::<Perlin>::new(PERLIN_NOISE_SEED);
     perlin_noise = perlin_noise.set_octaves(PERLIN_NOISE_OCTAVES);
 
     commands.insert_resource(NoiseGenerator {
@@ -312,31 +310,51 @@ struct NoiseGeneratorSettingsUpdate {
 struct StreamReceiver(Receiver<NoiseGeneratorSettingsUpdate>);
 
 fn start_zenoh_worker(mut commands: Commands) {
-    let (tx, rx) = channel::<NoiseGeneratorSettingsUpdate>(10);
+    let (mut tx, rx) = channel::<NoiseGeneratorSettingsUpdate>(10);
 
     std::thread::spawn(move || {
-        let rt = runtime::Builder::new_current_thread().build().unwrap();
+        let rt = runtime::Builder::new_current_thread()
+            .build()
+            .expect("Failed to build tokio runtime");
         rt.block_on(async {
-            //TODO (David): remove the unwraps
-            let zenoh_config = zenoh::config::Config::default();
-            let session = zenoh::open(zenoh_config).res().await.unwrap();
-
-            let subscriber = session
-                .declare_subscriber("face/settings")
-                .res()
-                .await
-                .unwrap();
-
-            while let Ok(message) = subscriber.recv_async().await {
-                let json_message: String = message.value.try_into().unwrap();
-                let wake_word_transcript: NoiseGeneratorSettingsUpdate =
-                    serde_json::from_str(&json_message).unwrap();
-                tx.send(wake_word_transcript).await.unwrap();
+            loop {
+                if let Err(error) = run_zenoh_loop(&mut tx).await {
+                    error!(?error, "Zenoh loop failed");
+                }
             }
         });
     });
 
     commands.insert_resource(StreamReceiver(rx));
+}
+
+async fn run_zenoh_loop(tx: &mut Sender<NoiseGeneratorSettingsUpdate>) -> anyhow::Result<()> {
+    let zenoh_config = zenoh::config::Config::default();
+    let session = zenoh::open(zenoh_config)
+        .res()
+        .await
+        .map_err(ErrorWrapper::ZenohError)
+        .context("Failed to create zenoh session")?;
+
+    let subscriber = session
+        .declare_subscriber("face/settings")
+        .res()
+        .await
+        .map_err(ErrorWrapper::ZenohError)
+        .context("Failed to create subscriber")?;
+
+    while let Ok(message) = subscriber.recv_async().await {
+        let json_message: String = message
+            .value
+            .try_into()
+            .context("Failed to convert value to string")?;
+        let wake_word_transcript: NoiseGeneratorSettingsUpdate =
+            serde_json::from_str(&json_message).context("Failed to parse json")?;
+        tx.send(wake_word_transcript)
+            .await
+            .context("Failed to send message on channel")?;
+    }
+    Ok(())
 }
 
 fn process_noise_generator_update_messages(
@@ -370,4 +388,10 @@ fn process_noise_generator_update_messages(
                 .set_octaves(perlin_noise_octaves);
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ErrorWrapper {
+    #[error("Zenoh error {0:?}")]
+    ZenohError(#[from] zenoh::Error),
 }
