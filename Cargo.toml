@@ -12,3 +12,8 @@ clap = { version = "4.5.4", features = ["derive"] }
 iyes_perf_ui = "0.2.3"
 noise = { version = "0.9.0" }
 rand = { version = "0.8.5" }
+
+tokio = { version = "*", features = ["full"] }
+zenoh = { version = "0.7.2-rc" }
+serde = { version = "*", features = ["derive"] }
+serde_json = { version = "*" }

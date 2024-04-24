@@ -36,3 +36,12 @@ sudo apt-get update && sudo apt-get install librust-alsa-sys-dev libudev-dev lib
 [autostart]
 face = WAYLAND_DISPLAY="" DISPLAY=":0" ~/Desktop/face
 ```
+
+## Zenoh commands
+
+```shell
+z_put --key face/settings --value '{"width_divider": 100.0}'
+z_put --key face/settings --value '{"perlin_noise_octaves": 1}'
+z_put --key face/settings --value '{"frame_time_divider": 2.0}'
+z_put --key face/settings --value '{"segment_width": 5.0}'
+```
