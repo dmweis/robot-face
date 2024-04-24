@@ -165,8 +165,10 @@ struct NoiseGenerator {
     generator: BasicMulti<Perlin>,
 }
 
-const WIDTH_COEFFICIENT: f64 = 100.0;
+const WIDTH_COEFFICIENT: f64 = 20.0;
 const HEIGHT_COEFFICIENT: f32 = 100.0;
+const POINT_WIDTH: usize = 5;
+const FRAME_TIME_DIVIDER: f64 = 2.0;
 
 fn update_noise_plot(
     mut query: Query<&mut Path, With<NoiseWave>>,
@@ -174,18 +176,18 @@ fn update_noise_plot(
     time: Res<Time>,
     noise_generator: ResMut<NoiseGenerator>,
 ) {
-    let step = time.elapsed_seconds_f64();
+    let step = time.elapsed_seconds_f64() / FRAME_TIME_DIVIDER;
 
     let mut resolution = Rect::default();
     for camera in query_camera.iter() {
         resolution = camera.area;
     }
 
-    let width = resolution.width() as usize;
+    let width = resolution.width() as usize / POINT_WIDTH;
 
     let mut noise = Vec::with_capacity(width);
 
-    for i in 0..width {
+    for i in 0..=(width + 1) {
         let next_noise = noise_generator
             .generator
             .get([step, (i as f64 / WIDTH_COEFFICIENT)]);
@@ -198,7 +200,7 @@ fn update_noise_plot(
             .enumerate()
             .map(|(index, point)| {
                 Vec2::new(
-                    resolution.min.x + index as f32,
+                    resolution.min.x + (index * POINT_WIDTH) as f32,
                     *point as f32 * HEIGHT_COEFFICIENT,
                 )
             })
