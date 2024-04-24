@@ -135,9 +135,29 @@ fn setup_system(mut commands: Commands) {
         closed: false,
     };
 
+    // spawn two shapes one hidden
+    // to allow 1 frame buffering on the raspberry pi
+    // This prevents flickering while the texture is loading
     commands.spawn((
         ShapeBundle {
             path: GeometryBuilder::build_as(&shape),
+            spatial: SpatialBundle {
+                visibility: Visibility::Hidden,
+                ..default()
+            },
+            ..default()
+        },
+        Stroke::new(Color::WHITE, 2.0),
+        Fill::color(Color::NONE),
+        NoiseWave,
+    ));
+    commands.spawn((
+        ShapeBundle {
+            path: GeometryBuilder::build_as(&shape),
+            spatial: SpatialBundle {
+                visibility: Visibility::Visible,
+                ..default()
+            },
             ..default()
         },
         Stroke::new(Color::WHITE, 2.0),
@@ -215,7 +235,7 @@ struct NoiseGenerator {
 }
 
 fn update_noise_plot(
-    mut query: Query<&mut Path, With<NoiseWave>>,
+    mut query: Query<(&mut Path, &mut Visibility), With<NoiseWave>>,
     query_camera: Query<&OrthographicProjection>,
     time: Res<Time>,
     noise_generator: ResMut<NoiseGenerator>,
@@ -239,7 +259,21 @@ fn update_noise_plot(
         noise.push(next_noise);
     }
 
-    for mut path in query.iter_mut() {
+    for (mut path, mut visibility) in query.iter_mut() {
+        // swap displayed shape
+        match *visibility {
+            Visibility::Hidden => {
+                *visibility = Visibility::Visible;
+                continue;
+            }
+            Visibility::Visible => {
+                *visibility = Visibility::Hidden;
+            }
+            _ => {
+                *visibility = Visibility::Hidden;
+            }
+        }
+
         let points = noise
             .iter()
             .enumerate()
