@@ -1,9 +1,13 @@
 [package]
+authors = ["David Michael Weis <dweis7@gmail.com>"]
 name = "face"
-version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Robot face"
+license = "MIT OR APACHE"
+publish = false
+readme = "README.md"
+repository = "https://github.com/dmweis/robot-face"
+version = "0.1.0"
 
 [dependencies]
 bevy = { version = "0.13.2", features = ["wayland"] }
@@ -13,7 +17,7 @@ iyes_perf_ui = "0.2.3"
 noise = { version = "0.9.0" }
 rand = { version = "0.8.5" }
 
-tokio = { version = "*", features = ["full"] }
+tokio = { version = "1.37", features = ["full"] }
 zenoh = { version = "0.7.2-rc" }
-serde = { version = "*", features = ["derive"] }
-serde_json = { version = "*" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
