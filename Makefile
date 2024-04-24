@@ -1,7 +1,7 @@
 
 .PHONY: copy-to-desktop
 copy-to-desktop:
-	cargo build --release -j2
+	cargo build --release -j3
 	cp target/release/face ~/Desktop
 
 
