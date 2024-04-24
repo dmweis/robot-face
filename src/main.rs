@@ -168,6 +168,7 @@ fn setup_system(mut commands: Commands) {
 
     commands.insert_resource(NoiseGenerator {
         generator: perlin_noise,
+        elapsed_step: 0.0,
     });
 }
 
@@ -230,16 +231,21 @@ fn close_on_right_click(
 #[derive(Resource)]
 struct NoiseGenerator {
     generator: BasicMulti<Perlin>,
+    /// keep elapsed steps to maintain continuity
+    elapsed_step: f64,
 }
 
 fn update_noise_plot(
     mut query: Query<(&mut Path, &mut Visibility), With<NoiseWave>>,
     query_camera: Query<&OrthographicProjection>,
     time: Res<Time>,
-    noise_generator: ResMut<NoiseGenerator>,
+    mut noise_generator: ResMut<NoiseGenerator>,
     noise_generator_settings: Res<NoiseGeneratorSettings>,
 ) {
-    let step = time.elapsed_seconds_f64() / noise_generator_settings.frame_time_divider;
+    // add to elapsed step to maintain continuity
+    let step_addition = time.delta_seconds_f64() / noise_generator_settings.frame_time_divider;
+    noise_generator.elapsed_step += step_addition;
+    let step = noise_generator.elapsed_step;
 
     let mut resolution = Rect::default();
     for camera in query_camera.iter() {
