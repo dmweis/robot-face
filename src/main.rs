@@ -108,7 +108,7 @@ fn setup_system(mut commands: Commands) {
             path: GeometryBuilder::build_as(&shape),
             ..default()
         },
-        Stroke::new(Color::BLACK, 2.0),
+        Stroke::new(Color::WHITE, 2.0),
         Fill::color(Color::NONE),
         NoiseWave,
     ));

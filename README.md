@@ -29,3 +29,10 @@ use `WGPU_BACKEND="gl"` to switch to OpenGL. But it doesn't seem to work
 ```shell
 sudo apt-get update && sudo apt-get install librust-alsa-sys-dev libudev-dev librust-wayland-sys-dev -y
 ```
+
+## Raspberry Pi startup
+
+```txt
+[autostart]
+face = WAYLAND_DISPLAY="" DISPLAY=":0" ~/Desktop/face
+```
