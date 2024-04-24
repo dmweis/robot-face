@@ -5,6 +5,10 @@ use bevy::{
         SystemInformationDiagnosticsPlugin,
     },
     prelude::*,
+    render::{
+        settings::{Backends, WgpuSettings},
+        RenderPlugin,
+    },
     window::{CursorGrabMode, PresentMode, WindowLevel, WindowResolution, WindowTheme},
 };
 use bevy_prototype_lyon::prelude::*;
@@ -57,10 +61,20 @@ fn main() {
     App::new()
         .insert_resource(Msaa::Sample4)
         .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(window_settings),
-                ..default()
-            }),
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(window_settings),
+                    ..default()
+                })
+                .set(RenderPlugin {
+                    render_creation: WgpuSettings {
+                        backends: Some(Backends::VULKAN),
+                        power_preference: bevy::render::settings::PowerPreference::HighPerformance,
+                        ..default()
+                    }
+                    .into(),
+                    ..default()
+                }),
             LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin,
             EntityCountDiagnosticsPlugin,
