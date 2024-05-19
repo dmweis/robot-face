@@ -22,8 +22,8 @@ use zenoh::prelude::r#async::*;
 const WIDTH_DIVIDER: f64 = 60.0;
 const HEIGHT_MULTIPLIER: f64 = 400.0;
 const SEGMENT_WIDTH: f32 = 5.0;
-const FRAME_TIME_DIVIDER: f64 = 2.0;
-const PERLIN_NOISE_OCTAVES: usize = 8;
+const FRAME_TIME_DIVIDER: f64 = 8.0;
+const PERLIN_NOISE_OCTAVES: usize = 2;
 
 const LINE_WIDTH: f32 = 2.0;
 const PERLIN_NOISE_SEED: u32 = 100;
