@@ -340,23 +340,49 @@ async fn run_zenoh_loop(tx: &mut Sender<NoiseGeneratorSettingsUpdate>) -> anyhow
         .res()
         .await
         .map_err(ErrorWrapper::ZenohError)
-        .context("Failed to create zenoh session")?;
+        .context("Failed to create zenoh session")?
+        .into_arc();
 
-    let subscriber = session
+    let settings_subscriber = session
         .declare_subscriber("face/settings")
         .res()
         .await
         .map_err(ErrorWrapper::ZenohError)
         .context("Failed to create subscriber")?;
 
-    while let Ok(message) = subscriber.recv_async().await {
+    let display_subscriber = session
+        .declare_subscriber("face/display")
+        .res()
+        .await
+        .map_err(ErrorWrapper::ZenohError)
+        .context("Failed to create subscriber")?;
+
+    tokio::spawn(async move {
+        while let Ok(message) = display_subscriber.recv_async().await {
+            let json_message: String = message
+                .value
+                .try_into()
+                .expect("Failed to convert value to string");
+            let display_control_message: DisplayControlMessage =
+                serde_json::from_str(&json_message).expect("Failed to parse json");
+            if display_control_message.display_on {
+                info!("Turning on display");
+                turn_on_display().await.expect("failed to turn on display");
+            } else {
+                info!("Turning off display");
+                turn_off_display().await.expect("failed to turn on display");
+            }
+        }
+    });
+
+    while let Ok(message) = settings_subscriber.recv_async().await {
         let json_message: String = message
             .value
             .try_into()
             .context("Failed to convert value to string")?;
-        let wake_word_transcript: NoiseGeneratorSettingsUpdate =
+        let settings_update: NoiseGeneratorSettingsUpdate =
             serde_json::from_str(&json_message).context("Failed to parse json")?;
-        tx.send(wake_word_transcript)
+        tx.send(settings_update)
             .await
             .context("Failed to send message on channel")?;
     }
@@ -400,4 +426,48 @@ fn process_noise_generator_update_messages(
 pub enum ErrorWrapper {
     #[error("Zenoh error {0:?}")]
     ZenohError(#[from] zenoh::Error),
+}
+
+#[derive(serde::Deserialize)]
+struct DisplayControlMessage {
+    #[serde(default)]
+    display_on: bool,
+}
+
+#[cfg(not(target_os = "linux"))]
+pub async fn turn_on_display() -> anyhow::Result<()> {
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub async fn turn_on_display() -> anyhow::Result<()> {
+    // wlr-randr --output HDMI-A-1 --on --transform 90
+    let status = tokio::process::Command::new("wlr-randr")
+        .arg("--output")
+        .arg("HDMI-A-1")
+        .arg("--on")
+        .arg("--transform")
+        .arg("270")
+        .status()
+        .await?;
+    info!("Turning on display {:?}", status);
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub async fn turn_off_display() -> anyhow::Result<()> {
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub async fn turn_off_display() -> anyhow::Result<()> {
+    // wlr-randr --output HDMI-A-1 --off
+    let status = tokio::process::Command::new("wlr-randr")
+        .arg("--output")
+        .arg("HDMI-A-1")
+        .arg("--off")
+        .status()
+        .await?;
+    info!("Turning off display {:?}", status);
+    Ok(())
 }
