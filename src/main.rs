@@ -96,18 +96,18 @@ fn main() {
                 primary_window: Some(window_settings),
                 ..default()
             }),
-            LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin,
-            EntityCountDiagnosticsPlugin,
-            SystemInformationDiagnosticsPlugin,
+            // LogDiagnosticsPlugin::default(),
+            // FrameTimeDiagnosticsPlugin,
+            // EntityCountDiagnosticsPlugin,
+            // SystemInformationDiagnosticsPlugin,
         ))
         .add_plugins(ShapePlugin)
-        .add_plugins(PerfUiPlugin)
+        // .add_plugins(PerfUiPlugin)
         .add_systems(Startup, (setup_system, start_zenoh_worker))
         .add_systems(
             Update,
             (
-                toggle_perf_ui.before(iyes_perf_ui::PerfUiSet::Setup),
+                // toggle_perf_ui.before(iyes_perf_ui::PerfUiSet::Setup),
                 toggle_fullscreen,
                 bevy::window::close_on_esc,
                 close_on_right_click,
