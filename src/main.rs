@@ -320,6 +320,7 @@ fn start_zenoh_worker(mut commands: Commands) {
 
     std::thread::spawn(move || {
         let rt = runtime::Builder::new_current_thread()
+            .enable_io()
             .build()
             .expect("Failed to build tokio runtime");
         rt.block_on(async {
