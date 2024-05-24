@@ -1,3 +1,4 @@
+mod display;
 mod noise_plugin;
 
 use anyhow::Context;
@@ -11,6 +12,7 @@ use bevy::{
     window::{CursorGrabMode, PresentMode, WindowLevel, WindowResolution, WindowTheme},
 };
 use clap::Parser;
+use display::DisplayControlMessage;
 use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin, PerfUiRoot};
 use noise_plugin::{NoiseGeneratorSettingsUpdate, NoisePlugin};
 use thiserror::Error;
@@ -19,6 +21,8 @@ use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
 };
 use zenoh::prelude::r#async::*;
+
+use crate::display::{turn_off_display, turn_on_display};
 
 /// Run robot face animation
 #[derive(Parser, Debug)]
@@ -227,48 +231,4 @@ async fn run_zenoh_loop(tx: &mut Sender<NoiseGeneratorSettingsUpdate>) -> anyhow
 pub enum ErrorWrapper {
     #[error("Zenoh error {0:?}")]
     ZenohError(#[from] zenoh::Error),
-}
-
-#[derive(serde::Deserialize)]
-struct DisplayControlMessage {
-    #[serde(default)]
-    display_on: bool,
-}
-
-#[cfg(not(target_os = "linux"))]
-pub async fn turn_on_display() -> anyhow::Result<()> {
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-pub async fn turn_on_display() -> anyhow::Result<()> {
-    // wlr-randr --output HDMI-A-1 --on --transform 90
-    let status = tokio::process::Command::new("wlr-randr")
-        .arg("--output")
-        .arg("HDMI-A-1")
-        .arg("--on")
-        .arg("--transform")
-        .arg("270")
-        .status()
-        .await?;
-    info!("Turning on display {:?}", status);
-    Ok(())
-}
-
-#[cfg(not(target_os = "linux"))]
-pub async fn turn_off_display() -> anyhow::Result<()> {
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-pub async fn turn_off_display() -> anyhow::Result<()> {
-    // wlr-randr --output HDMI-A-1 --off
-    let status = tokio::process::Command::new("wlr-randr")
-        .arg("--output")
-        .arg("HDMI-A-1")
-        .arg("--off")
-        .status()
-        .await?;
-    info!("Turning off display {:?}", status);
-    Ok(())
 }
