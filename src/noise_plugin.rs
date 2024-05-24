@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::*;
 use noise::{BasicMulti, MultiFractal, NoiseFn, Perlin};
 
-use crate::StreamReceiver;
+use crate::messaging::StreamReceiver;
 
 pub struct NoisePlugin;
 
