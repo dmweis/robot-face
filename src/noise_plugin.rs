@@ -33,6 +33,7 @@ struct NoiseGeneratorSettings {
     height_multiplier: f64,
     segment_width: f32,
     frame_time_divider: f64,
+    hidden: bool,
 }
 
 impl Default for NoiseGeneratorSettings {
@@ -42,6 +43,7 @@ impl Default for NoiseGeneratorSettings {
             height_multiplier: HEIGHT_MULTIPLIER,
             segment_width: SEGMENT_WIDTH,
             frame_time_divider: FRAME_TIME_DIVIDER,
+            hidden: false,
         }
     }
 }
@@ -111,9 +113,29 @@ fn update_noise_plot(
     mut noise_generator: ResMut<NoiseGenerator>,
     noise_generator_settings: Res<NoiseGeneratorSettings>,
 ) {
+    if noise_generator_settings.hidden {
+        // if we should be hidden hide all
+        for (mut _path, mut visibility) in query.iter_mut() {
+            *visibility = Visibility::Hidden
+        }
+        return;
+    } else {
+        // if we should be visible
+        // check if at least one visible
+        let visible = query
+            .iter()
+            .any(|(_path, visibility)| matches!(visibility, Visibility::Visible));
+        // if not make first one visible
+        if !visible {
+            if let Some((_path, mut visibility)) = query.iter_mut().next() {
+                *visibility = Visibility::Visible;
+            }
+        }
+    }
     // add to elapsed step to maintain continuity
     let step_addition = time.delta_seconds_f64() / noise_generator_settings.frame_time_divider;
     noise_generator.elapsed_step += step_addition;
+
     let step = noise_generator.elapsed_step;
 
     let mut resolution = Rect::default();
@@ -136,15 +158,14 @@ fn update_noise_plot(
         // swap displayed shape
         match *visibility {
             Visibility::Hidden => {
+                // display and do not update on the same loop
                 *visibility = Visibility::Visible;
                 continue;
             }
             Visibility::Visible => {
                 *visibility = Visibility::Hidden;
             }
-            _ => {
-                *visibility = Visibility::Hidden;
-            }
+            Visibility::Inherited => {}
         }
 
         let points = noise
@@ -179,6 +200,8 @@ pub struct NoiseGeneratorSettingsUpdate {
     frame_time_divider: Option<f64>,
     #[serde(default)]
     perlin_noise_octaves: Option<usize>,
+    #[serde(default)]
+    hidden: Option<bool>,
 }
 
 fn process_noise_generator_update_messages(
@@ -202,6 +225,10 @@ fn process_noise_generator_update_messages(
         if let Some(frame_time_divider) = message.frame_time_divider {
             info!(frame_time_divider, "Updating frame_time_divider");
             noise_generator_settings.frame_time_divider = frame_time_divider;
+        }
+        if let Some(hidden) = message.hidden {
+            info!(hidden, "Updating hidden");
+            noise_generator_settings.hidden = hidden;
         }
 
         if let Some(perlin_noise_octaves) = message.perlin_noise_octaves {
