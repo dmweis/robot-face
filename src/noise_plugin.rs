@@ -50,8 +50,6 @@ impl Default for NoiseGeneratorSettings {
 struct NoiseWave;
 
 fn setup_noise_system(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
-
     let points = [Vec2::new(-1.0, 0.0), Vec2::new(1.0, 0.0)].map(|x| x * 10000.);
 
     let shape = shapes::Polygon {

@@ -81,7 +81,7 @@ fn main() {
             NoisePlugin,
             PerfUiPlugin,
         ))
-        .add_systems(Startup, start_zenoh_worker)
+        .add_systems(Startup, (start_zenoh_worker, setup_camera_system))
         .add_systems(
             Update,
             (
@@ -93,6 +93,10 @@ fn main() {
             ),
         )
         .run();
+}
+
+fn setup_camera_system(mut commands: Commands) {
+    commands.spawn(Camera2dBundle::default());
 }
 
 #[derive(Resource, Deref, DerefMut)]
